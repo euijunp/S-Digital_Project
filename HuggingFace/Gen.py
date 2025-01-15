@@ -63,8 +63,34 @@ for output in outputs:
             "phishing_url": phishing_url
         }
         phishing_emails.append(phishing_email)
-        print(phishing_email)
 
-# 피싱 이메일을 JSON 파일에 저장
-with open("phishing_emails_dataset.json", "w") as file:
-    json.dump(phishing_emails, file, indent=4)
+# 생성된 피싱 이메일을 다시 자연스럽게 생성
+refined_phishing_emails = []
+for email in phishing_emails:
+    refine_prompt = (
+        "Refine the following email content to make it more natural and convincing: "
+        f"{email['content']}"
+    )
+    refine_inputs = tokenizer.encode(refine_prompt, return_tensors='tf')
+    refine_attention_mask = [[1] * len(refine_inputs[0])]
+    refine_outputs = model.generate(
+        refine_inputs, 
+        attention_mask=refine_attention_mask, 
+        max_length=300, 
+        temperature=0.7, 
+        top_k=50, 
+        top_p=0.95,
+        do_sample=True  # 샘플링 모드 활성화
+    )
+    refined_content = tokenizer.decode(refine_outputs[0], skip_special_tokens=True)
+    refined_phishing_email = {
+        "sender": email["sender"],
+        "content": refined_content,
+        "phishing_url": email["phishing_url"]
+    }
+    refined_phishing_emails.append(refined_phishing_email)
+    print(refined_phishing_email)
+
+# 수정된 피싱 이메일을 JSON 파일에 저장
+with open("refined_phishing_emails_dataset.json", "w") as file:
+    json.dump(refined_phishing_emails, file, indent=4)
