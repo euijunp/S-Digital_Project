@@ -10,8 +10,13 @@ prompt = "Dear customer, your account has been compromised. Click the link below
 
 # 텍스트 생성
 inputs = tokenizer.encode(prompt, return_tensors='tf')
-outputs = model.generate(inputs, max_length=200, num_return_sequences=1)
+attention_mask = [[1] * len(inputs[0])]
+outputs = model.generate(inputs, attention_mask=attention_mask, max_length=200, num_return_sequences=1)
 
 # 생성된 텍스트 디코딩
 phishing_email = tokenizer.decode(outputs[0], skip_special_tokens=True)
 print(phishing_email)
+
+# 피싱 이메일을 파일에 저장
+with open("phishing_email.txt", "w") as file:
+    file.write(phishing_email)
