@@ -20,20 +20,21 @@ def configure_cpu_only():
 # 모델 로드
 def load_model_and_tokenizer(model_name="distilgpt2"):
     model = TFGPT2LMHeadModel.from_pretrained(model_name)
-    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    tokenizer = GPT2Tokenizer.from_pretrained(model_name, padding_side="left")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     return model, tokenizer
 
-# 랜덤 URL 생성
+# 랜덤 URL 생성 (피싱 특성 강화)
 def generate_fake_url():
     return f"http://{''.join(random.choices(string.ascii_lowercase, k=5))}{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}.com"
 
-# 랜덤 이메일 주소 생성
+# 랜덤 이메일 주소 생성 (다양한 피싱 시나리오 반영)
 def generate_fake_email():
-    return f"{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}@{''.join(random.choices(string.ascii_lowercase, k=5))}.com"
+    domain = random.choice(['gmail', 'yahoo', 'hotmail', 'banking', 'support'])
+    return f"{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}@{domain}.com"
 
-# 이메일 내용 생성
+# 이메일 내용 생성 (속도 최적화)
 def generate_email_content(model, tokenizer, prompt, generation_count, max_length=300):
     try:
         inputs = tokenizer(prompt, return_tensors='tf', padding=True, truncation=True)
@@ -42,8 +43,9 @@ def generate_email_content(model, tokenizer, prompt, generation_count, max_lengt
             max_length=max_length,
             num_return_sequences=generation_count,
             temperature=0.7,
-            top_k=10,
-            top_p=0.85,
+            top_k=50,  # top_k 값을 늘려서 속도 향상
+            top_p=0.9,  # top_p 값을 늘려서 속도 향상
+            num_beams=1,  # beam search 비활성화
             do_sample=True,
             pad_token_id=tokenizer.pad_token_id
         )
@@ -60,15 +62,15 @@ def save_to_json(data, file_path):
     except Exception as e:
         print(f"Error saving to {file_path}: {e}")
 
-# 배치 처리 함수
+# 배치 처리 함수 (배치 크기 최적화)
 def process_batch(model, tokenizer, prompt, batch_size):
     return generate_email_content(model, tokenizer, prompt, batch_size)
 
-# 피싱 이메일 데이터셋 생성
+# 피싱 이메일 데이터셋 생성 (병렬 처리 최적화)
 def create_phishing_dataset(model, tokenizer, prompt, email_count, batch_size, file_path):
     phishing_emails = []
     start_time = time.time()
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:  # max_workers 값을 조정하여 병렬 처리 최적화
         with tqdm(total=email_count, desc="Generating emails", unit="email") as pbar:
             while len(phishing_emails) < email_count:
                 remaining = email_count - len(phishing_emails)
