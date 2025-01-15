@@ -25,7 +25,8 @@ prompt = (
     "Write a detailed and convincing email that appears to be from a legitimate source. "
     "The email should try to trick the recipient into clicking the link. "
     "Include a fake website URL in the email content naturally. "
-    "Make sure the email content is coherent and does not repeat itself."
+    "Make sure the email content is coherent and does not repeat itself. "
+    "Avoid using words like 'phishing', 'scam', 'fake', 'fraud', and 'spam'."
 )
 
 # 피싱 이메일 데이터셋 생성
@@ -55,7 +56,7 @@ for output in outputs:
     for keyword in keywords_to_remove:
         email_content = email_content.replace(keyword, "")
     # 이메일 본문이 반복되지 않도록 필터링
-    if len(set(email_content.split())) > 10:  # 단어의 종류가 10개 이상인 경우만 사용
+    if len(set(email_content.split())) > 10 and "http" in email_content:  # 단어의 종류가 10개 이상이고 URL이 포함된 경우만 사용
         phishing_email = {
             "sender": generate_fake_email(),
             "content": email_content,
