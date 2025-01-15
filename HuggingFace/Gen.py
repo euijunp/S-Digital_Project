@@ -1,26 +1,16 @@
-import json
-import random
-import string
 import os
-from concurrent.futures import ThreadPoolExecutor
+import random
+import json
+from concurrent.futures import ProcessPoolExecutor
+from functools import lru_cache
 from transformers import TFGPT2LMHeadModel, GPT2Tokenizer
-from tqdm import tqdm
-import time
-import tensorflow as tf
-
-# GPU 비활성화 설정 (CPU만 사용)
-def configure_cpu_only():
-    try:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # CUDA GPU 사용 안함
-        os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'false'  # GPU growth 허용 안함
-        tf.config.set_visible_devices([], 'GPU')  # GPU를 숨김
-    except Exception as e:
-        print(f"Error in configuring CPU only: {e}")
+import multiprocessing
+import string
 
 # 모델 로드
-def load_model_and_tokenizer(model_name="distilgpt2"):
+def load_model(model_name="gpt2"):
     model = TFGPT2LMHeadModel.from_pretrained(model_name)
-    tokenizer = GPT2Tokenizer.from_pretrained(model_name, padding_side="left")
+    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     return model, tokenizer
@@ -34,93 +24,102 @@ def generate_fake_email():
     domain = random.choice(['gmail', 'yahoo', 'hotmail', 'banking', 'support'])
     return f"{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}@{domain}.com"
 
-# 이메일 내용 생성 (속도 최적화)
-def generate_email_content(model, tokenizer, prompt, generation_count, max_length=300):
-    try:
-        inputs = tokenizer(prompt, return_tensors='tf', padding=True, truncation=True)
-        outputs = model.generate(
-            inputs['input_ids'],
-            max_length=max_length,
-            num_return_sequences=generation_count,
-            temperature=0.7,
-            top_k=50,  # top_k 값을 늘려서 속도 향상
-            top_p=0.9,  # top_p 값을 늘려서 속도 향상
-            num_beams=1,  # beam search 비활성화
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id
-        )
-        return [tokenizer.decode(output, skip_special_tokens=True).strip() for output in outputs]
-    except Exception as e:
-        print(f"Error generating email content: {e}")
-        return []
+# 프롬프트 스타일 및 랜덤 요소 정의
+def generate_random_prompt():
+    product_names = ["laptop", "smartphone", "headphones", "tablet", "watch"]
+    random_product = random.choice(product_names)
+    
+    extensions = [
+        "This offer expires soon, so don’t wait! Act now.",
+        "Hurry, this offer won’t last forever. Claim it today.",
+        "This is a limited-time offer, so take advantage of it while you can.",
+        "You are one of the few lucky recipients of this exclusive offer."
+    ]
+    random_extension = random.choice(extensions)
+    
+    prompts = [
+        f"You have a special offer waiting for you for a {random_product}. Please click the link below to claim your reward.",
+        f"Congratulations! You’ve been selected to receive a limited-time offer for a {random_product}. Click here to claim it.",
+        f"We are excited to inform you about a special discount on {random_product}. Don't miss out, click below to get started.",
+        f"This is your opportunity to claim a fantastic reward on {random_product}. Just follow the link below to proceed.",
+        f"Act now to take advantage of this exclusive offer on {random_product}. Click here to get started."
+    ]
+    
+    # 랜덤으로 프롬프트와 확장된 텍스트 선택
+    prompt = random.choice(prompts)
+    return f"{prompt} {random_extension}"
 
-# JSON 파일 저장
-def save_to_json(data, file_path):
-    try:
-        with open(file_path, "w") as file:
-            json.dump(data, file, indent=4)
-    except Exception as e:
-        print(f"Error saving to {file_path}: {e}")
-
-# 배치 처리 함수 (배치 크기 최적화)
-def process_batch(model, tokenizer, prompt, batch_size):
-    return generate_email_content(model, tokenizer, prompt, batch_size)
-
-# 피싱 이메일 데이터셋 생성 (병렬 처리 최적화)
-def create_phishing_dataset(model, tokenizer, prompt, email_count, batch_size, file_path):
-    phishing_emails = []
-    start_time = time.time()
-    with ThreadPoolExecutor(max_workers=8) as executor:  # max_workers 값을 조정하여 병렬 처리 최적화
-        with tqdm(total=email_count, desc="Generating emails", unit="email") as pbar:
-            while len(phishing_emails) < email_count:
-                remaining = email_count - len(phishing_emails)
-                batch_sizes = [min(batch_size, remaining)] * (remaining // batch_size + 1)
-                future_batches = [
-                    executor.submit(process_batch, model, tokenizer, prompt, batch)
-                    for batch in batch_sizes
-                ]
-                for future in future_batches:
-                    email_contents = future.result()
-                    for content in email_contents:
-                        phishing_url = generate_fake_url()
-                        content = content.replace(prompt, "").strip()
-                        content = content.replace(
-                            "Include a fake website URL in the email content naturally.",
-                            f"Click here to verify your account: {phishing_url}"
-                        )
-                        if len(set(content.split())) > 10 and "http" in content:
-                            phishing_emails.append({
-                                "sender": generate_fake_email(),
-                                "content": content,
-                                "phishing_url": phishing_url
-                            })
-                            pbar.update(1)  # 진행률 갱신
-                            if len(phishing_emails) >= email_count:
-                                break
-
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Phishing dataset created with {len(phishing_emails)} emails in {elapsed_time:.2f} seconds.")
-    save_to_json(phishing_emails, file_path)
-    return phishing_emails
-
-# 실행
-if __name__ == "__main__":
-    # CPU만 사용하도록 설정
-    configure_cpu_only()
-
-    model, tokenizer = load_model_and_tokenizer()
-    prompt = (
-        "Write a detailed and convincing email that appears to be from a legitimate source. "
-        "The email should try to trick the recipient into clicking the link. "
-        "Include a fake website URL in the email content naturally. "
-        "Make sure the email content is coherent and does not repeat itself. "
-        "Avoid using words like 'phishing', 'scam', 'fake', 'fraud', and 'spam'."
+# 캐시된 이메일 내용을 생성하는 함수
+@lru_cache(maxsize=128)
+def generate_email_content_cached(model_name, prompt, num_emails, max_length=300):
+    model, tokenizer = load_model(model_name)
+    inputs = tokenizer(prompt, return_tensors="tf", truncation=True, padding=True)
+    generated = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_return_sequences=num_emails,
+        no_repeat_ngram_size=3,  # n-gram 크기를 3으로 늘려서 반복을 줄임
+        do_sample=True,  # 샘플링 활성화
+        temperature=0.7,  # 샘플링에서 다양성 조정
+        top_p=0.85,       # top-p 설정
+        top_k=50,         # top-k 설정
     )
-    email_count = 10
-    batch_size = 3
+    return [tokenizer.decode(g, skip_special_tokens=True) for g in generated]
 
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    phishing_file = os.path.join(base_path, "phishing_emails_dataset.json")
+# 이메일 생성 함수
+def generate_email_batch(model_name, prompt, batch_size, max_length=300):
+    return generate_email_content_cached(model_name, prompt, batch_size, max_length)
 
-    phishing_emails = create_phishing_dataset(model, tokenizer, prompt, email_count, batch_size, phishing_file)
+# 이메일 데이터를 JSON 파일로 저장하는 함수
+def save_to_json(data, filename):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            existing_data = json.load(f)
+    else:
+        existing_data = []
+    existing_data.extend(data)
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(existing_data, f, ensure_ascii=False, indent=4)
+
+# 배치 생성 함수
+def generate_batch(args):
+    model_name, prompt, batch_size = args
+    return generate_email_batch(model_name, prompt, batch_size)
+
+# 이메일 생성 및 저장 함수 (병렬 처리)
+def process_email_batch_parallel(model_name, batch_size, total_batches, output_file):
+    with ProcessPoolExecutor() as executor:
+        # batch_size가 너무 크지 않도록 나누어 처리
+        batch_sizes = [(model_name, generate_random_prompt(), batch_size) for _ in range(total_batches)]
+        results = list(executor.map(generate_batch, batch_sizes))
+    
+    # 결과를 평탄화하여 한 번에 저장
+    all_generated_emails = [item for sublist in results for item in sublist]
+    
+    # 추가적으로 phishing-related 단어를 필터링하여 저장
+    filtered_emails = []
+    for email in all_generated_emails:
+        if not any(term in email.lower() for term in ['phishing', 'scam', 'fake', 'fraud', 'spam']):
+            phishing_url = generate_fake_url()  # 랜덤 URL 생성
+            sender_email = generate_fake_email()  # 랜덤 이메일 생성
+            filtered_emails.append({
+                "sender": sender_email,
+                "content": email,
+                "phishing_url": phishing_url
+            })
+    
+    save_to_json(filtered_emails, output_file)
+
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+
+    # 이메일 생성 파라미터 및 출력 파일 설정
+    batch_size = 10  # 한 번에 생성할 이메일 수
+    total_batches = 10  # 생성할 배치 수
+    output_file = "generated_emails.json"
+    model_name = "gpt2"
+
+    # 이메일 생성 및 저장
+    process_email_batch_parallel(model_name, batch_size, total_batches, output_file)
+
+    print(f"Generated emails saved to {output_file}")
