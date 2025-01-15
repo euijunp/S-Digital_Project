@@ -6,6 +6,7 @@ from functools import lru_cache
 from transformers import TFGPT2LMHeadModel, GPT2Tokenizer
 import multiprocessing
 import string
+from tqdm import tqdm
 
 # 모델 로드
 def load_model(model_name="gpt2"):
@@ -91,7 +92,11 @@ def process_email_batch_parallel(model_name, batch_size, total_batches, output_f
     with ProcessPoolExecutor() as executor:
         # batch_size가 너무 크지 않도록 나누어 처리
         batch_sizes = [(model_name, generate_random_prompt(), batch_size) for _ in range(total_batches)]
-        results = list(executor.map(generate_batch, batch_sizes))
+        results = []
+        with tqdm(total=total_batches, desc="Generating emails") as pbar:
+            for result in executor.map(generate_batch, batch_sizes):
+                results.append(result)
+                pbar.update(1)
     
     # 결과를 평탄화하여 한 번에 저장
     all_generated_emails = [item for sublist in results for item in sublist]
@@ -114,8 +119,8 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
     # 이메일 생성 파라미터 및 출력 파일 설정
-    batch_size = 10  # 한 번에 생성할 이메일 수
-    total_batches = 10  # 생성할 배치 수
+    batch_size = 20  # 한 번에 생성할 이메일 수
+    total_batches = 30  # 생성할 배치 수
     output_file = "generated_emails.json"
     model_name = "gpt2"
 
