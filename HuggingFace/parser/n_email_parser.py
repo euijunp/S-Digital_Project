@@ -5,7 +5,7 @@ from email import message_from_string
 
 # 파일 경로
 file_path = 'n_dataset/0001*'
-output_json_path = os.path.join(os.path.dirname(__file__), 'parsed_emails.json')
+output_json_path = os.path.join(os.path.dirname(__file__), 'n_dataset', 'parsed_emails.json')
 
 # 정규식: 본문 내 링크 추출
 url_regex = re.compile(r'https?://[^\s]+')
