@@ -4,7 +4,7 @@ import json
 from email import message_from_string
 
 # 파일 경로
-file_path = 'p_dataset/0001*'
+file_path = 'p_dataset/00001*'
 output_json_path = os.path.join(os.path.dirname(__file__), 'p_dataset', 'parsed_emails.json')
 
 # 정규식: 본문 내 링크 추출
@@ -16,7 +16,7 @@ parsed_emails = []
 # 파일이 저장된 디렉토리에서 각 파일을 처리
 directory = os.path.join(os.path.dirname(__file__), 'p_dataset')
 for i in range(1, 11): # 마지막 파일 번호 +1
-    prefix = f'{i:04d}'
+    prefix = f'{i:05d}'  # 00001부터 시작하도록 수정
     for filename in os.listdir(directory):
         if filename.startswith(prefix):
             file_full_path = os.path.join(directory, filename)
