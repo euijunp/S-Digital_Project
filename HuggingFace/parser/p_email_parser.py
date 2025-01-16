@@ -49,7 +49,7 @@ for i in range(1, 601): # 마지막 파일 번호 +1
                 parsed_emails.append({
                     'sender': sender,
                     'content': content.strip(),
-                    'urls': urls
+                    'phishing_url': urls
                 })
             break
 
