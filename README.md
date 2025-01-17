@@ -29,7 +29,7 @@
 
 ## 기술 스택
 
-- **Backend**: Python, Flask, Amazon Lambda, Amazon S3
+- **Backend**: Python, Flask, Amazon S3
 - **AI 모델**: GPT-2 (Hugging Face Transformers)
 - **병렬 처리**: `multiprocessing`, `concurrent.futures`
 - **데이터 저장**: JSON 파일, Amazon S3
