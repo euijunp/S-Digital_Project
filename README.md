@@ -4,6 +4,10 @@
 
 ---
 
+![My Image](https://github.com/euijunp/S-Digital_Project/raw/main/web.png)
+
+---
+
 ## 개요
 
 본 프로젝트는 AI를 활용하여 피싱 이메일 탐지 및 데이터를 자동으로 생성하는 시스템을 구축하는 것을 목표로 합니다.  
